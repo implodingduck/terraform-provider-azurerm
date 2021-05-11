@@ -924,6 +924,7 @@ func expandReplications(p []interface{}) []*containerregistry.Replication {
 
 func expandIdentityProperties(e []interface{}) *containerregistry.IdentityProperties {
 	identityProperties := containerregistry.IdentityProperties{}
+	identityProperties.Type = containerregistry.ResourceIdentityTypeNone
 	if len(e) > 0 {
 		v := e[0].(map[string]interface{})
 		identityPropertType := containerregistry.ResourceIdentityType(v["type"].(string))
