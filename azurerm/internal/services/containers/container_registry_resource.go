@@ -200,7 +200,7 @@ func resourceContainerRegistry() *schema.Resource {
 						"key_vault_key_id": {
 							Type:         schema.TypeString,
 							Required:     true,
-							ValidateFunc: keyVaultValidate.NestedItemId,
+							ValidateFunc: keyVaultValidate.NestedItemIdWithOptionalVersion,
 						},
 					},
 				},
@@ -533,6 +533,7 @@ func resourceContainerRegistryUpdate(d *schema.ResourceData, meta interface{}) e
 	quarantinePolicy := expandQuarantinePolicy(d.Get("quarantine_policy_enabled").(bool))
 	retentionPolicy := expandRetentionPolicy(d.Get("retention_policy").([]interface{}))
 	trustPolicy := expandTrustPolicy(d.Get("trust_policy").([]interface{}))
+	encryption := expandEncryption(d.Get("encryption").([]interface{}))
 
 	publicNetworkAccess := containerregistry.PublicNetworkAccessEnabled
 	if !d.Get("public_network_access_enabled").(bool) {
@@ -552,6 +553,7 @@ func resourceContainerRegistryUpdate(d *schema.ResourceData, meta interface{}) e
 				TrustPolicy:      trustPolicy,
 			},
 			PublicNetworkAccess: publicNetworkAccess,
+			Encryption:          encryption,
 		},
 		Identity: identity,
 		Tags:     tags.Expand(t),
