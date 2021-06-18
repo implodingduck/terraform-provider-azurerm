@@ -6,6 +6,7 @@ import (
 
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/helpers/azure"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/clients"
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/common"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/parse"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/tf/pluginsdk"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/tf/validation"
@@ -110,8 +111,8 @@ func dataSourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
 			d.Set("address_prefixes", utils.FlattenStringSlice(props.AddressPrefixes))
 		}
 
-		d.Set("enforce_private_link_endpoint_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
-		d.Set("enforce_private_link_service_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
+		d.Set("enforce_private_link_endpoint_network_policies", common.FlattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
+		d.Set("enforce_private_link_service_network_policies", common.FlattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
 
 		networkSecurityGroupId := ""
 		if props.NetworkSecurityGroup != nil && props.NetworkSecurityGroup.ID != nil {
@@ -125,7 +126,7 @@ func dataSourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
 		}
 		d.Set("route_table_id", routeTableId)
 
-		if err := d.Set("service_endpoints", flattenSubnetServiceEndpoints(props.ServiceEndpoints)); err != nil {
+		if err := d.Set("service_endpoints", common.FlattenSubnetServiceEndpoints(props.ServiceEndpoints)); err != nil {
 			return fmt.Errorf("setting `service_endpoints`: %+v", err)
 		}
 	}

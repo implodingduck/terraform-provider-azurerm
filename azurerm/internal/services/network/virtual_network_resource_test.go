@@ -202,6 +202,98 @@ func TestAccVirtualNetwork_bgpCommunity(t *testing.T) {
 	})
 }
 
+func TestAccVirtualNetwork_commonSubnetEnforcePrivateLinkEndpointNetworkPolicies(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_virtual_network", "test")
+	r := VirtualNetworkResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.commonSubnetEnforcePrivateLinkEndpointNetworkPolicies(data, true),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.enforce_private_link_endpoint_network_policies").HasValue("true"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.commonSubnetEnforcePrivateLinkEndpointNetworkPolicies(data, false),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.enforce_private_link_endpoint_network_policies").HasValue("false"),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccVirtualNetwork_commonSubnetEnforcePrivateLinkServiceNetworkPolicies(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_virtual_network", "test")
+	r := VirtualNetworkResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.commonSubnetEnforcePrivateLinkServiceNetworkPolicies(data, false),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.enforce_private_link_service_network_policies").HasValue("false"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.commonSubnetEnforcePrivateLinkServiceNetworkPolicies(data, true),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.enforce_private_link_service_network_policies").HasValue("true"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.commonSubnetEnforcePrivateLinkServiceNetworkPolicies(data, false),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.enforce_private_link_service_network_policies").HasValue("false"),
+			),
+		},
+	})
+}
+
+func TestAccVirtualNetwork_commonSubnetDelegation(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_virtual_network", "test")
+	r := VirtualNetworkResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.commonSubnetDelegation(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.delegation.0.name").HasValue("first"),
+			),
+		},
+	})
+}
+
+func TestAccVirtualNetwork_commonSubnetServiceEndpoints(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_virtual_network", "test")
+	r := VirtualNetworkResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.commonSubnetServiceEndpoints(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("subnet.0.id").Exists(),
+				check.That(data.ResourceName).Key("subnet.0.service_endpoints.0").HasValue("Microsoft.Sql"),
+			),
+		},
+	})
+}
+
 func (t VirtualNetworkResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
 	id, err := parse.VirtualNetworkID(state.ID)
 	if err != nil {
@@ -449,4 +541,123 @@ resource "azurerm_virtual_network" "test" {
   bgp_community = "12076:20000"
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
+}
+
+func (VirtualNetworkResource) commonSubnetServiceEndpoints(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_subnet_service_endpoint_storage_policy" "test" {
+  name                = "acctestSEP-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+}
+
+resource "azurerm_virtual_network" "test" {
+  name                = "acctestvirtnet%d"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+
+  subnet {
+    name                        = "subnet1"
+    address_prefix              = "10.0.1.0/24"
+	service_endpoints           = ["Microsoft.Sql"]
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger)
+}
+
+func (VirtualNetworkResource) commonSubnetDelegation(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_virtual_network" "test" {
+  name                = "acctestvirtnet%d"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+
+  subnet {
+    name                        = "subnet1"
+    address_prefix              = "10.0.1.0/24"
+
+	delegation {
+	  name = "first"
+	  service_delegation {
+		name = "Microsoft.ContainerInstance/containerGroups"
+		actions = [
+	      "Microsoft.Network/virtualNetworks/subnets/action",
+	    ]
+	  }
+	}
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
+}
+
+func (VirtualNetworkResource) commonSubnetEnforcePrivateLinkEndpointNetworkPolicies(data acceptance.TestData, enabled bool) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_virtual_network" "test" {
+  name                = "acctestvirtnet%d"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+
+  subnet {
+    name                        = "subnet1"
+    address_prefix              = "10.0.1.0/24"
+	enforce_private_link_endpoint_network_policies = %t
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, enabled)
+}
+
+func (VirtualNetworkResource) commonSubnetEnforcePrivateLinkServiceNetworkPolicies(data acceptance.TestData, enabled bool) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_virtual_network" "test" {
+  name                = "acctestvirtnet%d"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+
+  subnet {
+    name                        = "subnet1"
+    address_prefix              = "10.0.1.0/24"
+	enforce_private_link_service_network_policies = %t
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, enabled)
 }

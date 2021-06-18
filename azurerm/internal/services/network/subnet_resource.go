@@ -3,7 +3,6 @@ package network
 import (
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-11-01/network"
@@ -11,8 +10,8 @@ import (
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/helpers/tf"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/clients"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/locks"
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/common"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/parse"
-	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/validate"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/tf/pluginsdk"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/tf/validation"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/timeouts"
@@ -75,103 +74,15 @@ func resourceSubnet() *pluginsdk.Resource {
 				ExactlyOneOf: []string{"address_prefix", "address_prefixes"},
 			},
 
-			"service_endpoints": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				Elem:     &pluginsdk.Schema{Type: pluginsdk.TypeString},
-			},
+			"service_endpoints": common.SchemaSubnetServiceEndpoints(),
 
-			"service_endpoint_policy_ids": {
-				Type:     pluginsdk.TypeSet,
-				Optional: true,
-				MinItems: 1,
-				Elem: &pluginsdk.Schema{
-					Type:         pluginsdk.TypeString,
-					ValidateFunc: validate.SubnetServiceEndpointStoragePolicyID,
-				},
-			},
+			"service_endpoint_policy_ids": common.SchemaSubnetServiceEndpointPolicyIds(),
 
-			"delegation": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"name": {
-							Type:     pluginsdk.TypeString,
-							Required: true,
-						},
-						"service_delegation": {
-							Type:     pluginsdk.TypeList,
-							Required: true,
-							MaxItems: 1,
-							Elem: &pluginsdk.Resource{
-								Schema: map[string]*pluginsdk.Schema{
-									"name": {
-										Type:     pluginsdk.TypeString,
-										Required: true,
-										ValidateFunc: validation.StringInSlice([]string{
-											"Microsoft.ApiManagement/service",
-											"Microsoft.AzureCosmosDB/clusters",
-											"Microsoft.BareMetal/AzureVMware",
-											"Microsoft.BareMetal/CrayServers",
-											"Microsoft.Batch/batchAccounts",
-											"Microsoft.ContainerInstance/containerGroups",
-											"Microsoft.Databricks/workspaces",
-											"Microsoft.DBforMySQL/flexibleServers",
-											"Microsoft.DBforMySQL/serversv2",
-											"Microsoft.DBforPostgreSQL/flexibleServers",
-											"Microsoft.DBforPostgreSQL/serversv2",
-											"Microsoft.DBforPostgreSQL/singleServers",
-											"Microsoft.HardwareSecurityModules/dedicatedHSMs",
-											"Microsoft.Kusto/clusters",
-											"Microsoft.Logic/integrationServiceEnvironments",
-											"Microsoft.MachineLearningServices/workspaces",
-											"Microsoft.Netapp/volumes",
-											"Microsoft.Network/managedResolvers",
-											"Microsoft.PowerPlatform/vnetaccesslinks",
-											"Microsoft.ServiceFabricMesh/networks",
-											"Microsoft.Sql/managedInstances",
-											"Microsoft.Sql/servers",
-											"Microsoft.StreamAnalytics/streamingJobs",
-											"Microsoft.Synapse/workspaces",
-											"Microsoft.Web/hostingEnvironments",
-											"Microsoft.Web/serverFarms",
-										}, false),
-									},
+			"delegation": common.SchemaSubnetDelegation(),
 
-									"actions": {
-										Type:       pluginsdk.TypeList,
-										Optional:   true,
-										ConfigMode: pluginsdk.SchemaConfigModeAttr,
-										Elem: &pluginsdk.Schema{
-											Type: pluginsdk.TypeString,
-											ValidateFunc: validation.StringInSlice([]string{
-												"Microsoft.Network/networkinterfaces/*",
-												"Microsoft.Network/virtualNetworks/subnets/action",
-												"Microsoft.Network/virtualNetworks/subnets/join/action",
-												"Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
-												"Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action",
-											}, false),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			"enforce_private_link_endpoint_network_policies": common.SchemaEnforcePrivateLinkEndpointNetworkPolicies(),
 
-			"enforce_private_link_endpoint_network_policies": {
-				Type:     pluginsdk.TypeBool,
-				Optional: true,
-				Default:  false,
-			},
-
-			"enforce_private_link_service_network_policies": {
-				Type:     pluginsdk.TypeBool,
-				Optional: true,
-				Default:  false,
-			},
+			"enforce_private_link_service_network_policies": common.SchemaEnforcePrivateLinkServiceNetworkPolicies(),
 		},
 	}
 }
@@ -221,17 +132,17 @@ func resourceSubnetCreate(d *pluginsdk.ResourceData, meta interface{}) error {
 	// Network policies like network security groups are not supported by private endpoints.
 	privateEndpointNetworkPolicies := d.Get("enforce_private_link_endpoint_network_policies").(bool)
 	privateLinkServiceNetworkPolicies := d.Get("enforce_private_link_service_network_policies").(bool)
-	properties.PrivateEndpointNetworkPolicies = network.VirtualNetworkPrivateEndpointNetworkPolicies(expandSubnetPrivateLinkNetworkPolicy(privateEndpointNetworkPolicies))
-	properties.PrivateLinkServiceNetworkPolicies = network.VirtualNetworkPrivateLinkServiceNetworkPolicies(expandSubnetPrivateLinkNetworkPolicy(privateLinkServiceNetworkPolicies))
+	properties.PrivateEndpointNetworkPolicies = network.VirtualNetworkPrivateEndpointNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(privateEndpointNetworkPolicies))
+	properties.PrivateLinkServiceNetworkPolicies = network.VirtualNetworkPrivateLinkServiceNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(privateLinkServiceNetworkPolicies))
 
 	serviceEndpointsRaw := d.Get("service_endpoints").([]interface{})
-	properties.ServiceEndpoints = expandSubnetServiceEndpoints(serviceEndpointsRaw)
+	properties.ServiceEndpoints = common.ExpandSubnetServiceEndpoints(serviceEndpointsRaw)
 
 	serviceEndpointPoliciesRaw := d.Get("service_endpoint_policy_ids").(*pluginsdk.Set).List()
-	properties.ServiceEndpointPolicies = expandSubnetServiceEndpointPolicies(serviceEndpointPoliciesRaw)
+	properties.ServiceEndpointPolicies = common.ExpandSubnetServiceEndpointPolicies(serviceEndpointPoliciesRaw)
 
 	delegationsRaw := d.Get("delegation").([]interface{})
-	properties.Delegations = expandSubnetDelegation(delegationsRaw)
+	properties.Delegations = common.ExpandSubnetDelegation(delegationsRaw)
 
 	subnet := network.Subnet{
 		Name:                   utils.String(id.Name),
@@ -297,27 +208,27 @@ func resourceSubnetUpdate(d *pluginsdk.ResourceData, meta interface{}) error {
 
 	if d.HasChange("delegation") {
 		delegationsRaw := d.Get("delegation").([]interface{})
-		props.Delegations = expandSubnetDelegation(delegationsRaw)
+		props.Delegations = common.ExpandSubnetDelegation(delegationsRaw)
 	}
 
 	if d.HasChange("enforce_private_link_endpoint_network_policies") {
 		v := d.Get("enforce_private_link_endpoint_network_policies").(bool)
-		props.PrivateEndpointNetworkPolicies = network.VirtualNetworkPrivateEndpointNetworkPolicies(expandSubnetPrivateLinkNetworkPolicy(v))
+		props.PrivateEndpointNetworkPolicies = network.VirtualNetworkPrivateEndpointNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(v))
 	}
 
 	if d.HasChange("enforce_private_link_service_network_policies") {
 		v := d.Get("enforce_private_link_service_network_policies").(bool)
-		props.PrivateLinkServiceNetworkPolicies = network.VirtualNetworkPrivateLinkServiceNetworkPolicies(expandSubnetPrivateLinkNetworkPolicy(v))
+		props.PrivateLinkServiceNetworkPolicies = network.VirtualNetworkPrivateLinkServiceNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(v))
 	}
 
 	if d.HasChange("service_endpoints") {
 		serviceEndpointsRaw := d.Get("service_endpoints").([]interface{})
-		props.ServiceEndpoints = expandSubnetServiceEndpoints(serviceEndpointsRaw)
+		props.ServiceEndpoints = common.ExpandSubnetServiceEndpoints(serviceEndpointsRaw)
 	}
 
 	if d.HasChange("service_endpoint_policy_ids") {
 		serviceEndpointPoliciesRaw := d.Get("service_endpoint_policy_ids").(*pluginsdk.Set).List()
-		props.ServiceEndpointPolicies = expandSubnetServiceEndpointPolicies(serviceEndpointPoliciesRaw)
+		props.ServiceEndpointPolicies = common.ExpandSubnetServiceEndpointPolicies(serviceEndpointPoliciesRaw)
 	}
 
 	subnet := network.Subnet{
@@ -372,20 +283,20 @@ func resourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
 			d.Set("address_prefixes", props.AddressPrefixes)
 		}
 
-		delegation := flattenSubnetDelegation(props.Delegations)
+		delegation := common.FlattenSubnetDelegation(props.Delegations)
 		if err := d.Set("delegation", delegation); err != nil {
 			return fmt.Errorf("Error flattening `delegation`: %+v", err)
 		}
 
-		d.Set("enforce_private_link_endpoint_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
-		d.Set("enforce_private_link_service_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
+		d.Set("enforce_private_link_endpoint_network_policies", common.FlattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
+		d.Set("enforce_private_link_service_network_policies", common.FlattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
 
-		serviceEndpoints := flattenSubnetServiceEndpoints(props.ServiceEndpoints)
+		serviceEndpoints := common.FlattenSubnetServiceEndpoints(props.ServiceEndpoints)
 		if err := d.Set("service_endpoints", serviceEndpoints); err != nil {
 			return fmt.Errorf("Error setting `service_endpoints`: %+v", err)
 		}
 
-		serviceEndpointPolicies := flattenSubnetServiceEndpointPolicies(props.ServiceEndpointPolicies)
+		serviceEndpointPolicies := common.FlattenSubnetServiceEndpointPolicies(props.ServiceEndpointPolicies)
 		if err := d.Set("service_endpoint_policy_ids", serviceEndpointPolicies); err != nil {
 			return fmt.Errorf("Error setting `service_endpoint_policy_ids`: %+v", err)
 		}
@@ -420,146 +331,4 @@ func resourceSubnetDelete(d *pluginsdk.ResourceData, meta interface{}) error {
 	}
 
 	return nil
-}
-
-func expandSubnetServiceEndpoints(input []interface{}) *[]network.ServiceEndpointPropertiesFormat {
-	endpoints := make([]network.ServiceEndpointPropertiesFormat, 0)
-
-	for _, svcEndpointRaw := range input {
-		if svc, ok := svcEndpointRaw.(string); ok {
-			endpoint := network.ServiceEndpointPropertiesFormat{
-				Service: &svc,
-			}
-			endpoints = append(endpoints, endpoint)
-		}
-	}
-
-	return &endpoints
-}
-
-func flattenSubnetServiceEndpoints(serviceEndpoints *[]network.ServiceEndpointPropertiesFormat) []string {
-	endpoints := make([]string, 0)
-
-	if serviceEndpoints == nil {
-		return endpoints
-	}
-
-	for _, endpoint := range *serviceEndpoints {
-		if endpoint.Service != nil {
-			endpoints = append(endpoints, *endpoint.Service)
-		}
-	}
-
-	return endpoints
-}
-
-func expandSubnetDelegation(input []interface{}) *[]network.Delegation {
-	retDelegations := make([]network.Delegation, 0)
-
-	for _, deleValue := range input {
-		deleData := deleValue.(map[string]interface{})
-		deleName := deleData["name"].(string)
-		srvDelegations := deleData["service_delegation"].([]interface{})
-		srvDelegation := srvDelegations[0].(map[string]interface{})
-		srvName := srvDelegation["name"].(string)
-		srvActions := srvDelegation["actions"].([]interface{})
-
-		retSrvActions := make([]string, 0)
-		for _, srvAction := range srvActions {
-			srvActionData := srvAction.(string)
-			retSrvActions = append(retSrvActions, srvActionData)
-		}
-
-		retDelegation := network.Delegation{
-			Name: &deleName,
-			ServiceDelegationPropertiesFormat: &network.ServiceDelegationPropertiesFormat{
-				ServiceName: &srvName,
-				Actions:     &retSrvActions,
-			},
-		}
-
-		retDelegations = append(retDelegations, retDelegation)
-	}
-
-	return &retDelegations
-}
-
-func flattenSubnetDelegation(delegations *[]network.Delegation) []interface{} {
-	if delegations == nil {
-		return []interface{}{}
-	}
-
-	retDeles := make([]interface{}, 0)
-
-	for _, dele := range *delegations {
-		retDele := make(map[string]interface{})
-		if v := dele.Name; v != nil {
-			retDele["name"] = *v
-		}
-
-		svcDeles := make([]interface{}, 0)
-		svcDele := make(map[string]interface{})
-		if props := dele.ServiceDelegationPropertiesFormat; props != nil {
-			if v := props.ServiceName; v != nil {
-				svcDele["name"] = *v
-			}
-
-			if v := props.Actions; v != nil {
-				svcDele["actions"] = *v
-			}
-		}
-
-		svcDeles = append(svcDeles, svcDele)
-
-		retDele["service_delegation"] = svcDeles
-
-		retDeles = append(retDeles, retDele)
-	}
-
-	return retDeles
-}
-
-// TODO: confirm this logic below
-
-func expandSubnetPrivateLinkNetworkPolicy(enabled bool) string {
-	// This is strange logic, but to get the schema to make sense for the end user
-	// I exposed it with the same name that the Azure CLI does to be consistent
-	// between the tool sets, which means true == Disabled.
-	if enabled {
-		return "Disabled"
-	}
-
-	return "Enabled"
-}
-
-func flattenSubnetPrivateLinkNetworkPolicy(input string) bool {
-	// This is strange logic, but to get the schema to make sense for the end user
-	// I exposed it with the same name that the Azure CLI does to be consistent
-	// between the tool sets, which means true == Disabled.
-	return strings.EqualFold(input, "Disabled")
-}
-
-func expandSubnetServiceEndpointPolicies(input []interface{}) *[]network.ServiceEndpointPolicy {
-	output := make([]network.ServiceEndpointPolicy, 0)
-	for _, policy := range input {
-		policy := policy.(string)
-		output = append(output, network.ServiceEndpointPolicy{ID: &policy})
-	}
-	return &output
-}
-
-func flattenSubnetServiceEndpointPolicies(input *[]network.ServiceEndpointPolicy) []interface{} {
-	if input == nil {
-		return nil
-	}
-
-	var output []interface{}
-	for _, policy := range *input {
-		id := ""
-		if policy.ID != nil {
-			id = *policy.ID
-		}
-		output = append(output, id)
-	}
-	return output
 }

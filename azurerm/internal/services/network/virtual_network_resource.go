@@ -13,6 +13,7 @@ import (
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/helpers/tf"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/clients"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/locks"
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/common"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/parse"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/network/validate"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/tags"
@@ -138,6 +139,15 @@ func resourceVirtualNetwork() *pluginsdk.Resource {
 							Type:     pluginsdk.TypeString,
 							Computed: true,
 						},
+						"service_endpoints": common.SchemaSubnetServiceEndpoints(),
+
+						"service_endpoint_policy_ids": common.SchemaSubnetServiceEndpointPolicyIds(),
+
+						"delegation": common.SchemaSubnetDelegation(),
+
+						"enforce_private_link_endpoint_network_policies": common.SchemaEnforcePrivateLinkEndpointNetworkPolicies(),
+
+						"enforce_private_link_service_network_policies": common.SchemaEnforcePrivateLinkServiceNetworkPolicies(),
 					},
 				},
 				Set: resourceAzureSubnetHash,
@@ -342,6 +352,23 @@ func expandVirtualNetworkProperties(ctx context.Context, d *pluginsdk.ResourceDa
 				subnetObj.SubnetPropertiesFormat.NetworkSecurityGroup = nil
 			}
 
+			privateEndpointNetworkPolicies := subnet["enforce_private_link_endpoint_network_policies"].(bool)
+			log.Printf("[INFO] privateEndpointNetworkPolicies %t", privateEndpointNetworkPolicies)
+			privateLinkServiceNetworkPolicies := subnet["enforce_private_link_service_network_policies"].(bool)
+			log.Printf("[INFO] privateLinkServiceNetworkPolicies %t", privateLinkServiceNetworkPolicies)
+			subnetObj.SubnetPropertiesFormat.PrivateEndpointNetworkPolicies = network.VirtualNetworkPrivateEndpointNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(privateEndpointNetworkPolicies))
+			subnetObj.SubnetPropertiesFormat.PrivateLinkServiceNetworkPolicies = network.VirtualNetworkPrivateLinkServiceNetworkPolicies(common.ExpandSubnetPrivateLinkNetworkPolicy(privateLinkServiceNetworkPolicies))
+
+			serviceEndpointsRaw := subnet["service_endpoints"].([]interface{})
+			log.Printf("[INFO] serviceEndpointsRaw %v", serviceEndpointsRaw)
+			subnetObj.SubnetPropertiesFormat.ServiceEndpoints = common.ExpandSubnetServiceEndpoints(serviceEndpointsRaw)
+
+			serviceEndpointPoliciesRaw := subnet["service_endpoint_policy_ids"].(*pluginsdk.Set).List()
+			subnetObj.SubnetPropertiesFormat.ServiceEndpointPolicies = common.ExpandSubnetServiceEndpointPolicies(serviceEndpointPoliciesRaw)
+
+			delegationsRaw := subnet["delegation"].([]interface{})
+			subnetObj.SubnetPropertiesFormat.Delegations = common.ExpandSubnetDelegation(delegationsRaw)
+
 			subnets = append(subnets, *subnetObj)
 		}
 	}
@@ -429,6 +456,21 @@ func flattenVirtualNetworkSubnets(input *[]network.Subnet) *pluginsdk.Set {
 						output["security_group"] = *nsg.ID
 					}
 				}
+				if delegation := props.Delegations; delegation != nil {
+					output["delegation"] = common.FlattenSubnetDelegation(delegation)
+				}
+				if eplenp := props.PrivateEndpointNetworkPolicies; eplenp != "" {
+					output["enforce_private_link_endpoint_network_policies"] = common.FlattenSubnetPrivateLinkNetworkPolicy(string(eplenp))
+				}
+				if eplsnp := props.PrivateLinkServiceNetworkPolicies; eplsnp != "" {
+					output["enforce_private_link_service_network_policies"] = common.FlattenSubnetPrivateLinkNetworkPolicy(string(eplsnp))
+				}
+				if serviceEndpoints := props.ServiceEndpoints; serviceEndpoints != nil {
+					output["service_endpoints"] = common.FlattenSubnetServiceEndpoints(serviceEndpoints)
+				}
+				if serviceEndpointPolicies := props.ServiceEndpointPolicies; serviceEndpointPolicies != nil {
+					output["service_endpoint_policy_ids"] = common.FlattenSubnetServiceEndpointPolicies(serviceEndpointPolicies)
+				}
 			}
 
 			results.Add(output)
@@ -460,6 +502,21 @@ func resourceAzureSubnetHash(v interface{}) int {
 		}
 		if v, ok := m["security_group"]; ok {
 			buf.WriteString(v.(string))
+		}
+		if v, ok := m["service_endpoint_policy_ids"]; ok {
+			buf.WriteString(fmt.Sprintf("%v", v))
+		}
+		if v, ok := m["service_endpoints"]; ok {
+			buf.WriteString(fmt.Sprintf("%v", v))
+		}
+		if v, ok := m["enforce_private_link_endpoint_network_policies"]; ok {
+			buf.WriteString(fmt.Sprintf("%t", v.(bool)))
+		}
+		if v, ok := m["enforce_private_link_service_network_policies"]; ok {
+			buf.WriteString(fmt.Sprintf("%t", v.(bool)))
+		}
+		if v, ok := m["delegation"]; ok {
+			buf.WriteString(fmt.Sprintf("%v", v))
 		}
 	}
 
