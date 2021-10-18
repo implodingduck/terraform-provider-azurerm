@@ -1618,7 +1618,7 @@ func resourceKubernetesClusterRead(d *pluginsdk.ResourceData, meta interface{}) 
 			return fmt.Errorf("setting `windows_profile`: %+v", err)
 		}
 
-		httpProxyConfig := flattenKubernetesClusterHttpProxyConfig(props.HTTPProxyConfig)
+		httpProxyConfig := flattenKubernetesClusterHttpProxyConfig(props)
 		if err := d.Set("http_proxy_config", httpProxyConfig); err != nil {
 			return fmt.Errorf("setting `http_proxy_config`: %+v", err)
 		}
@@ -2632,12 +2632,34 @@ func expandKubernetesClusterHttpProxyConfig(input []interface{}) *containerservi
 	return &httpProxyConfig
 }
 
-func flattenKubernetesClusterHttpProxyConfig(httpProxyConfig *containerservice.ManagedClusterHTTPProxyConfig) []interface{} {
+func flattenKubernetesClusterHttpProxyConfig(props *containerservice.ManagedClusterProperties) []interface{} {
 	results := make(map[string]interface{})
+	httpProxyConfig := props.HTTPProxyConfig
 	if httpProxyConfig != nil {
 		results["http_proxy"] = httpProxyConfig.HTTPProxy
 		results["https_proxy"] = httpProxyConfig.HTTPSProxy
-		results["no_proxy"] = httpProxyConfig.NoProxy
+		noProxyList := httpProxyConfig.NoProxy
+		// Removing the default values that AKS always applies from the flatten
+		newNoProxyList := make([]string, len(*noProxyList))
+		ignoreList := []string{
+			"168.63.129.16",
+			"169.254.169.254",
+			"127.0.0.1",
+			"localhost",
+			"konnectivity",
+			*props.NetworkProfile.ServiceCidr,
+			*props.NetworkProfile.DockerBridgeCidr,
+			*props.Fqdn,
+		}
+		i := 0
+		for _, element := range *noProxyList {
+			if !utils.SliceContainsValue(ignoreList, element) {
+				newNoProxyList[i] = element
+				i++
+			}
+		}
+		newNoProxyList = newNoProxyList[:i]
+		results["no_proxy"] = newNoProxyList
 		results["trusted_ca"] = httpProxyConfig.TrustedCa
 	}
 
