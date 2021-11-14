@@ -2143,13 +2143,13 @@ resource "azurerm_network_interface" "test" {
 }
 
 resource "azurerm_linux_virtual_machine" "test" {
-  name                  = "vm-test-proxy%d"
-  resource_group_name   = azurerm_resource_group.test.name
-  location              = azurerm_resource_group.test.location
-  size                  = "Standard_B1s"
-  admin_username        = "adminuser"
-  admin_password        = "P@ssW0RD1234"
-  custom_data           = base64encode("#!/bin/bash\nsudo apt-get update\nsudo apt-get install tinyproxy -y\nsudo echo \"Allow 10.0.0.0/8\" \u003e\u003e /etc/tinyproxy/tinyproxy.conf\nsystemctl restart tinyproxy")
+  name                            = "vm-test-proxy%d"
+  resource_group_name             = azurerm_resource_group.test.name
+  location                        = azurerm_resource_group.test.location
+  size                            = "Standard_B1s"
+  admin_username                  = "adminuser"
+  admin_password                  = "P@ssW0RD1234"
+  custom_data                     = base64encode("#!/bin/bash\nsudo apt-get update\nsudo apt-get install tinyproxy -y\nsudo echo \"Allow 10.0.0.0/8\" \u003e\u003e /etc/tinyproxy/tinyproxy.conf\nsystemctl restart tinyproxy")
   disable_password_authentication = false
   network_interface_ids = [
     azurerm_network_interface.test.id,
@@ -2186,9 +2186,9 @@ resource "azurerm_kubernetes_cluster" "test" {
   }
 
   default_node_pool {
-    name           = "default"
-    node_count     = 2
-    vm_size        = "Standard_DS2_v2"
+    name       = "default"
+    node_count = 2
+    vm_size    = "Standard_DS2_v2"
   }
 
   identity {
@@ -2196,11 +2196,11 @@ resource "azurerm_kubernetes_cluster" "test" {
   }
 
   network_profile {
-    network_plugin    = "azure"
+    network_plugin = "azure"
   }
 
   http_proxy_config {
-    http_proxy = "http://${azurerm_network_interface.test.private_ip_address}:8888/"    
+    http_proxy  = "http://${azurerm_network_interface.test.private_ip_address}:8888/"
     https_proxy = "http://${azurerm_network_interface.test.private_ip_address}:8888/"
   }
 }
@@ -2243,13 +2243,13 @@ resource "azurerm_network_interface" "test" {
 }
 
 resource "azurerm_linux_virtual_machine" "test" {
-  name                  = "vm-test-proxy%d"
-  resource_group_name   = azurerm_resource_group.test.name
-  location              = azurerm_resource_group.test.location
-  size                  = "Standard_B1s"
-  admin_username        = "adminuser"
-  admin_password        = "P@ssW0RD1234"
-  custom_data           = base64encode("#!/bin/bash\nsudo apt-get update\nsudo apt-get install tinyproxy -y\nsudo echo \"Allow 10.0.0.0/8\" \u003e\u003e /etc/tinyproxy/tinyproxy.conf\nsystemctl restart tinyproxy")
+  name                            = "vm-test-proxy%d"
+  resource_group_name             = azurerm_resource_group.test.name
+  location                        = azurerm_resource_group.test.location
+  size                            = "Standard_B1s"
+  admin_username                  = "adminuser"
+  admin_password                  = "P@ssW0RD1234"
+  custom_data                     = base64encode("#!/bin/bash\nsudo apt-get update\nsudo apt-get install tinyproxy -y\nsudo echo \"Allow 10.0.0.0/8\" \u003e\u003e /etc/tinyproxy/tinyproxy.conf\nsystemctl restart tinyproxy")
   disable_password_authentication = false
   network_interface_ids = [
     azurerm_network_interface.test.id,
@@ -2297,11 +2297,11 @@ resource "azurerm_kubernetes_cluster" "test" {
   }
 
   network_profile {
-    network_plugin    = "azure"
+    network_plugin = "azure"
   }
 
   http_proxy_config {
-    http_proxy = "http://${azurerm_network_interface.test.private_ip_address}:8888/"    
+    http_proxy  = "http://${azurerm_network_interface.test.private_ip_address}:8888/"
     https_proxy = "http://${azurerm_network_interface.test.private_ip_address}:8888/"
   }
 }
