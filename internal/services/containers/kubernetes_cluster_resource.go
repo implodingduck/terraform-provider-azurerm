@@ -1706,7 +1706,7 @@ func resourceKubernetesClusterRead(d *pluginsdk.ResourceData, meta interface{}) 
 			return fmt.Errorf("setting `windows_profile`: %+v", err)
 		}
 
-		httpProxyConfig := flattenKubernetesClusterHttpProxyConfig(props)
+		httpProxyConfig := flattenKubernetesClusterHttpProxyConfig(props, flattenedDefaultNodePool)
 		if err := d.Set("http_proxy_config", httpProxyConfig); err != nil {
 			return fmt.Errorf("setting `http_proxy_config`: %+v", err)
 		}
@@ -2720,7 +2720,7 @@ func expandKubernetesClusterHttpProxyConfig(input []interface{}) *containerservi
 	return &httpProxyConfig
 }
 
-func flattenKubernetesClusterHttpProxyConfig(props *containerservice.ManagedClusterProperties) []interface{} {
+func flattenKubernetesClusterHttpProxyConfig(props *containerservice.ManagedClusterProperties, flattenedDefaultNodePool *[]interface{}) []interface{} {
 	results := make(map[string]interface{})
 	httpProxyConfig := props.HTTPProxyConfig
 	if httpProxyConfig != nil {
@@ -2735,10 +2735,23 @@ func flattenKubernetesClusterHttpProxyConfig(props *containerservice.ManagedClus
 			"127.0.0.1",
 			"localhost",
 			"konnectivity",
-			*props.NetworkProfile.ServiceCidr,
-			*props.NetworkProfile.DockerBridgeCidr,
-			*props.Fqdn,
 		}
+		if props.NetworkProfile.PodCidr != nil && *props.NetworkProfile.PodCidr != "" {
+			ignoreList = append(ignoreList, *props.NetworkProfile.PodCidr)
+		}
+		if props.NetworkProfile.ServiceCidr != nil && *props.NetworkProfile.ServiceCidr != "" {
+			ignoreList = append(ignoreList, *props.NetworkProfile.ServiceCidr)
+		}
+		if props.NetworkProfile.DockerBridgeCidr != nil && *props.NetworkProfile.DockerBridgeCidr != "" {
+			ignoreList = append(ignoreList, *props.NetworkProfile.DockerBridgeCidr)
+		}
+		if props.Fqdn != nil && *props.Fqdn != "" {
+			ignoreList = append(ignoreList, *props.Fqdn)
+		}
+		if (*flattenedDefaultNodePool)[0] != nil && (*flattenedDefaultNodePool)[0].(map[string]interface{})["vnet_subnet_id"] == "" {
+			ignoreList = append(ignoreList, "10.240.0.0/12")
+		}
+
 		i := 0
 		for _, element := range *noProxyList {
 			if !utils.SliceContainsValue(ignoreList, element) {
