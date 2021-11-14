@@ -585,6 +585,11 @@ func testAccKubernetesCluster_prefixedLoadBalancerProfile(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesCluster_changingLoadBalancerProfile(t *testing.T) {
+	checkIfShouldRunTestsIndividually(t)
+	testAccKubernetesCluster_changingLoadBalancerProfile(t)
+}
+
 func testAccKubernetesCluster_changingLoadBalancerProfile(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_kubernetes_cluster", "test")
 	r := KubernetesClusterResource{}
